@@ -508,7 +508,7 @@ const MemoizedAppSidebarInner = memo(
               leftIcon={SvgSettings}
               folded={folded}
             >
-              {isAdmin ? "Admin Panel" : "Curator Panel"}
+              {isAdmin ? "Admin" : "Curator Panel"}
             </SidebarTab>
           )}
           <UserAvatarPopover

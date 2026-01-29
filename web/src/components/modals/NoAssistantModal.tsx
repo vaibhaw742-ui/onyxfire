@@ -22,10 +22,10 @@ export default function NoAssistantModal() {
             <>
               <Text as="p">
                 As an administrator, you can create a new assistant by visiting
-                the admin panel.
+                Admin.
               </Text>
               <Button className="w-full" href="/admin/assistants">
-                Go to Admin Panel
+                Go to Admin
               </Button>
             </>
           ) : (

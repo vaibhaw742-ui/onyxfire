@@ -144,7 +144,7 @@ const LLMStepInner = ({
               disabled={disabled}
               href="admin/configuration/llm"
             >
-              View in Admin Panel
+              View in Admin
             </Button>
           </div>
         </div>
