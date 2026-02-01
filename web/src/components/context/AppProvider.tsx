@@ -8,6 +8,7 @@ import { User } from "@/lib/types";
 import { ModalProvider } from "@/components/context/ModalContext";
 import { AuthTypeMetadata } from "@/lib/userSS";
 import { AppSidebarProvider } from "@/refresh-components/contexts/AppSidebarContext";
+import { KnowledgeBankProvider } from "@/refresh-components/contexts/KnowledgeBankContext";
 
 interface AppProviderProps {
   children: React.ReactNode;
@@ -15,6 +16,7 @@ interface AppProviderProps {
   settings: CombinedSettings;
   authTypeMetadata: AuthTypeMetadata;
   folded?: boolean;
+  knowledgeBankOpen?: boolean;
 }
 
 export default function AppProvider({
@@ -23,6 +25,7 @@ export default function AppProvider({
   settings,
   authTypeMetadata,
   folded,
+  knowledgeBankOpen,
 }: AppProviderProps) {
   return (
     <SettingsProvider settings={settings}>
@@ -34,7 +37,9 @@ export default function AppProvider({
         <ProviderContextProvider>
           <ModalProvider user={user}>
             <AppSidebarProvider folded={!!folded}>
-              {children}
+              <KnowledgeBankProvider initialOpen={knowledgeBankOpen ?? true}>
+                {children}
+              </KnowledgeBankProvider>
             </AppSidebarProvider>
           </ModalProvider>
         </ProviderContextProvider>

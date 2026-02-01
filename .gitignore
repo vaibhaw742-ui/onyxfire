@@ -26,6 +26,9 @@ backend/onyx/evals/one_off/*.json
 *.log
 *.csv
 
+# Ignore docker runtime artifacts
+deployment/docker_compose/*
+
 # secret files
 .env
 jira_test_env
