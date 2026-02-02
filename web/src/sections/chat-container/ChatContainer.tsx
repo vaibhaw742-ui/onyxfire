@@ -39,7 +39,7 @@ interface ChatContainerProps {
 
 export default function ChatContainer({ children }: ChatContainerProps) {
   return (
-    <div className="flex-1 min-w-0 h-full flex flex-col bg-background-tint-01 rounded-2xl overflow-hidden">
+    <div className="flex-1 min-w-0 h-full flex flex-col bg-background-tint-01 rounded-3xl overflow-hidden">
       <ChatContainerHeader />
       <div className="flex-1 min-h-0 overflow-hidden">
         {children}

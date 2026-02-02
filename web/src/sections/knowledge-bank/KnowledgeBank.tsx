@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, useCallback } from "react";
+import { memo, useState, useCallback, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import Text from "@/refresh-components/texts/Text";
 import IconButton from "@/refresh-components/buttons/IconButton";
@@ -12,7 +12,16 @@ import {
   SvgFileText,
   SvgChevronRight,
   SvgChevronDown,
+  SvgCopy,
+  SvgSearch,
+  SvgCode,
 } from "@opal/icons";
+
+// Constants for resize constraints
+const MIN_WIDTH = 200;
+const MAX_WIDTH = 500;
+const DEFAULT_WIDTH = 288; // 18rem
+const COLLAPSED_WIDTH = 52; // 3.25rem
 
 // File type icons based on extension
 function getFileIcon(fileName: string) {
@@ -236,7 +245,7 @@ const KnowledgeBankInner = memo(({ onClose }: KnowledgeBankInnerProps) => {
   }, []);
 
   return (
-    <div className="h-full flex flex-col bg-background-tint-02 w-[18rem] rounded-2xl">
+    <div className="h-full w-full flex flex-col">
       <Header onClose={onClose} />
       <div className="flex-1 overflow-y-auto py-2 px-1">
         <TreeView nodes={SAMPLE_TREE_DATA} onFileClick={handleFileClick} />
@@ -247,14 +256,145 @@ const KnowledgeBankInner = memo(({ onClose }: KnowledgeBankInnerProps) => {
 });
 KnowledgeBankInner.displayName = "KnowledgeBankInner";
 
+// Collapsed sidebar with icon strip
+interface CollapsedSidebarProps {
+  onExpand: () => void;
+}
+
+function CollapsedSidebar({ onExpand }: CollapsedSidebarProps) {
+  return (
+    <div className="h-full w-full flex flex-col py-3">
+      <div className="flex flex-col items-center gap-1">
+        <IconButton
+          icon={SvgCopy}
+          tertiary
+          onClick={onExpand}
+          tooltip="Documents"
+        />
+        <IconButton
+          icon={SvgFolder}
+          tertiary
+          onClick={onExpand}
+          tooltip="Folders"
+        />
+        <IconButton
+          icon={SvgSearch}
+          tertiary
+          onClick={onExpand}
+          tooltip="Search"
+        />
+        <IconButton
+          icon={SvgCode}
+          tertiary
+          onClick={onExpand}
+          tooltip="Code"
+        />
+      </div>
+    </div>
+  );
+}
+
+// Resize handle component
+interface ResizeHandleProps {
+  onResizeStart: (e: React.MouseEvent) => void;
+  isResizing: boolean;
+}
+
+function ResizeHandle({ onResizeStart, isResizing }: ResizeHandleProps) {
+  return (
+    <div
+      className={cn(
+        "absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-10",
+        "hover:bg-interactive-primary/50 active:bg-interactive-primary",
+        "transition-colors duration-150",
+        isResizing && "bg-interactive-primary"
+      )}
+      onMouseDown={onResizeStart}
+    />
+  );
+}
+
 export default function KnowledgeBank() {
   const { open, setOpen } = useKnowledgeBankContext();
+  const [width, setWidth] = useState(DEFAULT_WIDTH);
+  const [isResizing, setIsResizing] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  if (!open) return null;
+  // Load saved width from localStorage on mount
+  useEffect(() => {
+    const savedWidth = localStorage.getItem("knowledge_bank_width");
+    if (savedWidth) {
+      const parsed = parseInt(savedWidth, 10);
+      if (!isNaN(parsed) && parsed >= MIN_WIDTH && parsed <= MAX_WIDTH) {
+        setWidth(parsed);
+      }
+    }
+  }, []);
+
+  // Handle resize start
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  // Handle resize during mouse move
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+
+      // Calculate new width based on mouse position from right edge of viewport
+      const viewportWidth = window.innerWidth;
+      const newWidth = viewportWidth - e.clientX - 8; // 8px for padding
+
+      // Clamp to min/max constraints
+      const clampedWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, newWidth));
+      setWidth(clampedWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      // Save width to localStorage
+      localStorage.setItem("knowledge_bank_width", width.toString());
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+
+    // Add cursor style to body during resize
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isResizing, width]);
 
   return (
-    <div className="flex-shrink-0 h-full">
-      <KnowledgeBankInner onClose={() => setOpen(false)} />
+    <div className="flex-shrink-0 h-full" ref={containerRef}>
+      <div
+        className={cn(
+          "h-full flex flex-col bg-background-tint-02 rounded-2xl overflow-hidden relative",
+          !isResizing && "transition-[width] duration-200 ease-in-out"
+        )}
+        style={{ width: open ? `${width}px` : `${COLLAPSED_WIDTH}px` }}
+      >
+        {open && (
+          <ResizeHandle
+            onResizeStart={handleResizeStart}
+            isResizing={isResizing}
+          />
+        )}
+        {open ? (
+          <KnowledgeBankInner onClose={() => setOpen(false)} />
+        ) : (
+          <CollapsedSidebar onExpand={() => setOpen(true)} />
+        )}
+      </div>
     </div>
   );
 }

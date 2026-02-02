@@ -27,7 +27,7 @@ export interface KnowledgeBankProviderProps {
 }
 
 export function KnowledgeBankProvider({
-  initialOpen = true,
+  initialOpen = false,
   children,
 }: KnowledgeBankProviderProps) {
   const [open, setOpenInternal] = useState(initialOpen);
