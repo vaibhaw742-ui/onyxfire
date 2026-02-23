@@ -111,6 +111,7 @@ backend = [
     "SQLAlchemy[mypy]==2.0.15",
     "starlette==0.47.2",
     "supervisor==4.3.0",
+    "watchdog==6.0.0",
     "RapidFuzz==3.13.0",
     "tiktoken==0.7.0",
     "timeago==1.0.16",

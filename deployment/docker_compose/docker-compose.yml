@@ -108,6 +108,8 @@ services:
       - api_server_logs:/var/log/onyx
       # Shared volume for persistent document storage (Craft file-system mode)
       - file-system:/app/file-system
+      # Knowledge Bank: mount host ~/categories into the container
+      - ${CATEGORIES_DIR:-/home/ec2-user/categories}:/root/categories
 
   background:
     image: ${ONYX_BACKEND_IMAGE:-onyxdotapp/onyx-backend:${IMAGE_TAG:-latest}}

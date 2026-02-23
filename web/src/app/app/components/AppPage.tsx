@@ -1,6 +1,6 @@
 "use client";
 
-import { redirect, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { HealthCheckBanner } from "@/components/health/healthcheck";
 import {
   personaIncludesRetrieval,
@@ -438,10 +438,6 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
     }
   }, [documentSidebarVisible, updateCurrentDocumentSidebarVisible]);
 
-  if (!user) {
-    redirect("/auth/login");
-  }
-
   const handleChatInputSubmit = useCallback(
     (message: string) => {
       onSubmit({
@@ -470,6 +466,12 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
   const handleDesktopDocumentSidebarClose = useCallback(() => {
     setTimeout(() => updateCurrentDocumentSidebarVisible(false), 300);
   }, [updateCurrentDocumentSidebarVisible]);
+
+  if (!user) {
+    // Layout handles server-side auth via requireAuth(); redirecting here
+    // causes a loop when auth is disabled (login page redirects back to /app).
+    return null;
+  }
 
   const desktopDocumentSidebar =
     retrievalEnabled && !settings.isMobile ? (

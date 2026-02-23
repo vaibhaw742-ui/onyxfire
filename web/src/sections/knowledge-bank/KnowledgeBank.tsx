@@ -15,6 +15,7 @@ import {
   SvgCopy,
   SvgSearch,
   SvgCode,
+  SvgArrowLeft,
 } from "@opal/icons";
 
 // Constants for resize constraints
@@ -122,14 +123,26 @@ function FolderItem({
 
 interface HeaderProps {
   onClose: () => void;
+  onBack?: () => void;
+  title?: string;
 }
 
-function Header({ onClose }: HeaderProps) {
+function Header({ onClose, onBack, title = "Knowledge Bank" }: HeaderProps) {
   return (
     <div className="flex flex-row w-full items-center justify-between gap-2 py-3 px-3">
-      <Text as="p" headingH3 text02>
-        Knowledge Bank
-      </Text>
+      <div className="flex items-center gap-1 min-w-0">
+        {onBack && (
+          <IconButton
+            icon={SvgArrowLeft}
+            tertiary
+            onClick={onBack}
+            tooltip="Back to tree"
+          />
+        )}
+        <Text as="p" headingH3 text02 className="truncate">
+          {title}
+        </Text>
+      </div>
       <IconButton
         icon={SvgSidebar}
         tertiary
@@ -140,65 +153,28 @@ function Header({ onClose }: HeaderProps) {
   );
 }
 
-function Footer() {
+interface FooterProps {
+  selectedPath?: string;
+}
+
+function Footer({ selectedPath }: FooterProps) {
   return (
-    <div className="px-3 py-3">
-      <Text as="p" text03 secondaryBody>
-        Select a file to view architecture specs.
+    <div className="px-3 py-2 border-t border-border-subtle">
+      <Text as="p" text03 secondaryBody className="truncate font-mono text-xs">
+        {selectedPath ? `~/categories/${selectedPath}` : "~/categories"}
       </Text>
     </div>
   );
 }
 
-// Sample data structure for the knowledge bank tree
-// This will later be replaced with backend data
-const SAMPLE_TREE_DATA = [
-  {
-    type: "folder" as const,
-    name: "Agents",
-    defaultOpen: true,
-    children: [
-      { type: "file" as const, name: "orchestrator.ts" },
-      { type: "file" as const, name: "tools_registry.py" },
-      { type: "file" as const, name: "memory_buffer.ts" },
-    ],
-  },
-  {
-    type: "folder" as const,
-    name: "RAG",
-    defaultOpen: true,
-    children: [
-      { type: "file" as const, name: "ingest_vdb.py" },
-      { type: "file" as const, name: "retriever.py" },
-      { type: "file" as const, name: "reranker_v2.json" },
-    ],
-  },
-  {
-    type: "folder" as const,
-    name: "LLM Training",
-    defaultOpen: true,
-    children: [
-      { type: "file" as const, name: "train_lora.py" },
-      { type: "file" as const, name: "dataset_gen.ts" },
-      { type: "file" as const, name: "weights.config" },
-    ],
-  },
-  {
-    type: "folder" as const,
-    name: "LLM Inference",
-    defaultOpen: false,
-    children: [],
-  },
-];
-
 type TreeNode =
   | { type: "folder"; name: string; defaultOpen?: boolean; children: TreeNode[] }
-  | { type: "file"; name: string };
+  | { type: "file"; name: string; path: string };
 
 interface TreeViewProps {
   nodes: TreeNode[];
   depth?: number;
-  onFileClick?: (fileName: string) => void;
+  onFileClick?: (path: string, name: string) => void;
 }
 
 function TreeView({ nodes, depth = 0, onFileClick }: TreeViewProps) {
@@ -226,7 +202,7 @@ function TreeView({ nodes, depth = 0, onFileClick }: TreeViewProps) {
             key={`${node.name}-${index}`}
             name={node.name}
             depth={depth + 1}
-            onClick={() => onFileClick?.(node.name)}
+            onClick={() => onFileClick?.(node.path, node.name)}
           />
         );
       })}
@@ -239,16 +215,181 @@ interface KnowledgeBankInnerProps {
 }
 
 const KnowledgeBankInner = memo(({ onClose }: KnowledgeBankInnerProps) => {
-  const handleFileClick = useCallback((fileName: string) => {
-    // TODO: Implement file selection logic when backend is ready
-    console.log("Selected file:", fileName);
+  const [treeData, setTreeData] = useState<TreeNode[]>([]);
+  const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  // File content state
+  const [selectedFile, setSelectedFile] = useState<{ path: string; name: string } | null>(null);
+  const [fileContent, setFileContent] = useState<string | null>(null);
+  const [fileLoading, setFileLoading] = useState(false);
+  const [fileError, setFileError] = useState("");
+
+  // Connect to SSE watch endpoint for real-time updates
+  useEffect(() => {
+    let abortController: AbortController | null = new AbortController();
+
+    const connectSSE = async () => {
+      try {
+        const response = await fetch("/api/knowledge-bank/watch", {
+          headers: { Accept: "text/event-stream" },
+          signal: abortController!.signal,
+        });
+
+        if (!response.ok) {
+          setErrorMsg(`Server responded with ${response.status}`);
+          setStatus("error");
+          return;
+        }
+        if (!response.body) {
+          setErrorMsg("No response body");
+          setStatus("error");
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let currentEvent = "";
+        let currentData = "";
+
+        const dispatchEvent = () => {
+          if (currentData !== "") {
+            try {
+              const tree = JSON.parse(currentData) as TreeNode[];
+              setTreeData(tree);
+              setStatus("ok");
+            } catch {
+              // ignore malformed JSON
+            }
+          }
+          currentEvent = "";
+          currentData = "";
+        };
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            const trimmed = line.replace(/\r$/, "");
+            if (trimmed === "") {
+              if (currentEvent === "change") dispatchEvent();
+              currentEvent = "";
+              currentData = "";
+            } else if (trimmed.startsWith("event:")) {
+              currentEvent = trimmed.slice("event:".length).trim();
+            } else if (trimmed.startsWith("data:")) {
+              const piece = trimmed.slice("data:".length).trimStart();
+              currentData = currentData ? currentData + "\n" + piece : piece;
+            }
+          }
+        }
+      } catch (err: any) {
+        if (err?.name !== "AbortError") {
+          setStatus("error");
+          setErrorMsg("Connection lost — retrying…");
+          setTimeout(() => {
+            if (abortController) {
+              setStatus("loading");
+              setErrorMsg("");
+              connectSSE();
+            }
+          }, 3000);
+        }
+      }
+    };
+
+    connectSSE();
+
+    return () => {
+      abortController?.abort();
+      abortController = null;
+    };
   }, []);
+
+  const handleFileClick = useCallback(async (path: string, name: string) => {
+    setSelectedFile({ path, name });
+    setFileContent(null);
+    setFileError("");
+    setFileLoading(true);
+    try {
+      const res = await fetch(
+        `/api/knowledge-bank/file?path=${encodeURIComponent(path)}`
+      );
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      const text = await res.text();
+      setFileContent(text);
+    } catch (e: any) {
+      setFileError(`Failed to load: ${e.message}`);
+    } finally {
+      setFileLoading(false);
+    }
+  }, []);
+
+  const handleBack = useCallback(() => {
+    setSelectedFile(null);
+    setFileContent(null);
+    setFileError("");
+  }, []);
+
+  if (selectedFile) {
+    return (
+      <div className="h-full w-full flex flex-col">
+        <Header
+          onClose={onClose}
+          onBack={handleBack}
+          title={selectedFile.name}
+        />
+        <div className="flex-1 overflow-y-auto p-3">
+          {fileLoading ? (
+            <Text as="p" text03 secondaryBody>
+              Loading…
+            </Text>
+          ) : fileError ? (
+            <Text as="p" text03 secondaryBody>
+              {fileError}
+            </Text>
+          ) : (
+            <pre className="text-xs text-text-02 whitespace-pre-wrap break-words font-mono leading-relaxed">
+              {fileContent}
+            </pre>
+          )}
+        </div>
+        <Footer selectedPath={selectedFile.path} />
+      </div>
+    );
+  }
 
   return (
     <div className="h-full w-full flex flex-col">
       <Header onClose={onClose} />
       <div className="flex-1 overflow-y-auto py-2 px-1">
-        <TreeView nodes={SAMPLE_TREE_DATA} onFileClick={handleFileClick} />
+        {status === "loading" ? (
+          <div className="px-3 py-4">
+            <Text as="p" text03 secondaryBody>
+              Loading…
+            </Text>
+          </div>
+        ) : status === "error" ? (
+          <div className="px-3 py-4">
+            <Text as="p" text03 secondaryBody>
+              {errorMsg || "Failed to connect"}
+            </Text>
+          </div>
+        ) : treeData.length === 0 ? (
+          <div className="px-3 py-4">
+            <Text as="p" text03 secondaryBody>
+              ~/categories is empty
+            </Text>
+          </div>
+        ) : (
+          <TreeView nodes={treeData} onFileClick={handleFileClick} />
+        )}
       </div>
       <Footer />
     </div>
