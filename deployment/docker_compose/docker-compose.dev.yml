@@ -7,40 +7,76 @@
 # Or set COMPOSE_FILE environment variable:
 #   export COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml
 #   docker compose up -d --wait
-
 services:
   api_server:
     ports:
       - "8080:8080"
-
+    environment:
+      - LEARNING_SERVICE_URL=http://learning_service:8001
   # Uncomment the block below to enable the MCP server for Onyx.
   # mcp_server:
   #   ports:
   #     - "8090:8090"
-
   relational_db:
     ports:
       - "5432:5432"
-
   index:
     ports:
       - "19071:19071"
       - "8081:8081"
-
   inference_model_server:
     ports:
       - "9000:9000"
-
   cache:
     ports:
       - "6379:6379"
-
   minio:
     # use different ports to avoid conflicts with model servers
     ports:
       - "9004:9000"
       - "9005:9001"
-
   code-interpreter:
     ports:
       - "8000:8000"
+  learning_service:
+    build:
+      context: ../../learning_service
+      dockerfile: Dockerfile
+    container_name: learning_service
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - DB_HOST=relational_db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-postgres}
+      - DB_PASS=${POSTGRES_PASSWORD:-password}
+      - DB_NAME=${POSTGRES_USER:-postgres}
+      - DB_SCHEMA=learning
+      - LEARNING_SERVICE_PORT=8001
+    depends_on:
+      relational_db:
+        condition: service_healthy
+    volumes:
+      - learning_categories:/app/categories
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    restart: unless-stopped
+    ports:
+      - "5050:80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL:-admin@admin.com}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD:-admin}
+      - PGADMIN_CONFIG_SERVER_MODE=False
+      - PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED=False
+    depends_on:
+      relational_db:
+        condition: service_healthy
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+volumes:
+  learning_categories:
+  pgadmin_data:

@@ -64,3 +64,8 @@ target "integration" {
 
   tags      = ["${INTEGRATION_REPOSITORY}:${TAG}"]
 }
+target "learning_service" {
+  context    = "./learning_service"
+  dockerfile = "./learning_service/Dockerfile"
+  tags       = ["onyxfire/learning_service:${TAG}"]
+}
