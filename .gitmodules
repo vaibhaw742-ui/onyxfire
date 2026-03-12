@@ -1,3 +1,3 @@
 [submodule "openclaw_learning"]
 	path = openclaw_learning
-	url = https://github.com/vaibhaw742-ui/openclaw-learning.git
+	url = git@github.com:vaibhaw742-ui/openclaw-learning.git
