@@ -1,9 +1,18 @@
 import datetime
 import json
 import os
+from collections.abc import AsyncGenerator
 from collections.abc import Generator
 from datetime import timedelta
 from uuid import UUID
+
+# OpenClaw gateway configuration (env-var driven)
+_OPENCLAW_ENABLED = os.getenv("OPENCLAW_ENABLED", "").lower() in ("1", "true", "yes")
+_OPENCLAW_GATEWAY_URL = os.getenv("OPENCLAW_GATEWAY_URL", "ws://host.docker.internal:18789")
+_OPENCLAW_GATEWAY_TOKEN = os.getenv(
+    "OPENCLAW_GATEWAY_TOKEN",
+    "7b76d106c87353e62f78cf0c66eb92de6fbc3e1c3725b7c6",
+)
 
 from fastapi import APIRouter
 from fastapi import Depends
@@ -20,6 +29,7 @@ from onyx.auth.api_key import get_hashed_api_key_from_request
 from onyx.auth.pat import get_hashed_pat_from_request
 from onyx.auth.users import current_chat_accessible_user
 from onyx.auth.users import current_user
+from onyx.chat.openclaw_gateway import stream_from_openclaw
 from onyx.chat.chat_processing_checker import is_chat_session_processing
 from onyx.chat.chat_state import ChatStateContainer
 from onyx.chat.chat_utils import convert_chat_history_basic
@@ -633,6 +643,25 @@ def handle_send_chat_message(
             result = gather_stream_full(packets, state_container)
             # Note: LLM cost tracking is now handled in multi_llm.py
             return result
+
+    # OpenClaw gateway path: route through local OpenClaw WebSocket instead of LLM
+    if _OPENCLAW_ENABLED:
+        session_key = str(chat_message_req.chat_session_id or "default")
+
+        async def openclaw_generator() -> AsyncGenerator[str, None]:
+            try:
+                async for packet in stream_from_openclaw(
+                    message=chat_message_req.message,
+                    session_key=session_key,
+                    gateway_url=_OPENCLAW_GATEWAY_URL,
+                    token=_OPENCLAW_GATEWAY_TOKEN,
+                ):
+                    yield get_json_line(packet.model_dump())
+            except Exception as e:
+                logger.exception("Error in OpenClaw gateway streaming")
+                yield json.dumps({"error": str(e)}) + "\n"
+
+        return StreamingResponse(openclaw_generator(), media_type="text/event-stream")
 
     # Streaming path, normal Onyx UI behavior
     def stream_generator() -> Generator[str, None, None]:
