@@ -42,7 +42,7 @@ services:
       - "8000:8000"
 
   learning_service:
-    image: 641152421489.dkr.ecr.ap-south-1.amazonaws.com/learning-service:latest
+    image: 982733204083.dkr.ecr.ap-south-1.amazonaws.com/learning-service:latest
     container_name: learning_service
     restart: unless-stopped
     ports:
