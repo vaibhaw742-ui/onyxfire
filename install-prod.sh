@@ -36,6 +36,11 @@ read -p "Airtop API key: " AIRTOP_API_KEY
 read -p "Postgres password [password]: " INPUT_POSTGRES_PASSWORD
 POSTGRES_PASSWORD="${INPUT_POSTGRES_PASSWORD:-password}"
 
+echo ""
+echo "AWS credentials (for pulling from ECR):"
+read -p "AWS Access Key ID: " AWS_ACCESS_KEY_ID
+read -p "AWS Secret Access Key: " AWS_SECRET_ACCESS_KEY
+
 ECR_URI="$ECR_ACCOUNT_ID.dkr.ecr.$ECR_REGION.amazonaws.com"
 
 echo ""
@@ -44,7 +49,7 @@ echo "📋 Configuration summary:"
 echo "  ECR:           $ECR_URI/$ECR_REPO"
 echo "  OnyxFire repo: $ONYXFIRE_REPO ($ONYXFIRE_BRANCH)"
 echo "  OpenAI key:    ${OPENAI_API_KEY:0:8}..."
-echo "  Categories dir: $CATEGORIES_MD_DIR"
+echo "  AWS key:       ${AWS_ACCESS_KEY_ID:0:8}..."
 echo "============================================================"
 read -p "Press ENTER to start installation..."
 echo ""
@@ -83,10 +88,21 @@ sudo snap install aws-cli --classic
 aws --version
 
 # =============================================================================
-# Step 4 — SSH key for GitHub
+# Step 4 — Configure AWS credentials
 # =============================================================================
 echo ""
-echo "🔑 Step 4: Setting up SSH key for GitHub..."
+echo "🔑 Step 4: Configuring AWS credentials..."
+aws configure set aws_access_key_id "$AWS_ACCESS_KEY_ID"
+aws configure set aws_secret_access_key "$AWS_SECRET_ACCESS_KEY"
+aws configure set default.region "$ECR_REGION"
+aws configure set default.output json
+echo "✅ AWS credentials configured"
+
+# =============================================================================
+# Step 5 — SSH key for GitHub
+# =============================================================================
+echo ""
+echo "🔑 Step 5: Setting up SSH key for GitHub..."
 if [ ! -f ~/.ssh/id_ed25519 ]; then
   ssh-keygen -t ed25519 -C "prod-ec2" -f ~/.ssh/id_ed25519 -N ""
 fi
@@ -99,10 +115,10 @@ read -p "Press ENTER after adding the key to GitHub..."
 ssh -T git@github.com || true
 
 # =============================================================================
-# Step 5 — Clone OnyxFire repo
+# Step 6 — Clone OnyxFire repo
 # =============================================================================
 echo ""
-echo "📂 Step 5: Cloning OnyxFire repo..."
+echo "📂 Step 6: Cloning OnyxFire repo..."
 cd ~
 git clone $ONYXFIRE_REPO
 cd onyxfire
@@ -111,19 +127,19 @@ git submodule update --init --recursive
 echo "✅ Repo cloned"
 
 # =============================================================================
-# Step 6 — ECR login
+# Step 7 — ECR login
 # =============================================================================
 echo ""
-echo "🔐 Step 6: Logging into ECR..."
+echo "🔐 Step 7: Logging into ECR..."
 aws ecr get-login-password --region $ECR_REGION | \
   docker login --username AWS --password-stdin $ECR_URI
 echo "✅ ECR login successful"
 
 # =============================================================================
-# Step 7 — Set up .env file
+# Step 8 — Set up .env file
 # =============================================================================
 echo ""
-echo "⚙️  Step 7: Setting up .env file..."
+echo "⚙️  Step 8: Setting up .env file..."
 cd ~/onyxfire/deployment/docker_compose
 read -p "Categories MD dir (container path) [/workspace/categories]: " INPUT_CATEGORIES_MD_DIR
 CATEGORIES_MD_DIR="${INPUT_CATEGORIES_MD_DIR:-/workspace/categories}"
@@ -152,10 +168,10 @@ _set_env "CATEGORIES_MD_DIR" "$CATEGORIES_MD_DIR"
 echo "✅ .env created from env.template"
 
 # =============================================================================
-# Step 8 — Start OnyxFire stack
+# Step 9 — Start OnyxFire stack
 # =============================================================================
 echo ""
-echo "🚀 Step 8: Starting OnyxFire stack..."
+echo "🚀 Step 9: Starting OnyxFire stack..."
 cd ~/onyxfire/deployment/docker_compose
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
@@ -166,8 +182,6 @@ sleep 30
 echo ""
 echo "📋 Container status:"
 docker compose -f docker-compose.yml -f docker-compose.dev.yml ps
-
-
 
 # =============================================================================
 # Final health checks
