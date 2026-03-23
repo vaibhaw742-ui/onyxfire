@@ -14,14 +14,15 @@ services:
     command: >
       sh -c "apk add --no-cache libc6-compat &&
              ([ -d node_modules/.bin ] || npm ci) &&
-             npx next dev -p 3000"
+             npx next build &&
+             npx next start -p 3000"
     volumes:
       - ../../web:/app
       - web_node_modules:/app/node_modules
     environment:
-      - NODE_ENV=development
       - NEXT_TELEMETRY_DISABLED=1
       - INTERNAL_URL=${INTERNAL_URL:-http://api_server:8080}
+      - NODE_OPTIONS=--max-old-space-size=4096
 
   api_server:
     command: >
