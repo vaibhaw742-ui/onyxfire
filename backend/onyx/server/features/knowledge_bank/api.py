@@ -21,7 +21,7 @@ logger = setup_logger()
 
 router = APIRouter(prefix="/knowledge-bank")
 
-WATCH_DIR = Path.home() / "categories"
+WATCH_DIR = Path(os.environ.get("CATEGORIES_MD_DIR", str(Path.home() / "categories")))
 
 _SSE_HEADERS = {
     "Cache-Control": "no-cache",
