@@ -109,7 +109,7 @@ services:
       # Shared volume for persistent document storage (Craft file-system mode)
       - file-system:/app/file-system
       # Knowledge Bank: mount openclaw_learning workspace/categories into the container
-      - ${CATEGORIES_DIR:-/home/ec2-user/onyxfire/openclaw_learning/workspace/categories}:/root/categories
+      - ${CATEGORIES_DIR:-/root/onyxfire/openclaw_learning/workspace/categories}:/app/categories
 
   background:
     image: ${ONYX_BACKEND_IMAGE:-vkhemka06/supa-backend:${IMAGE_TAG:-latest}}
