@@ -675,30 +675,6 @@ const ChatInputBar = React.memo(
 
           {/* Bottom right controls */}
           <div className="flex flex-row items-center gap-1">
-            {/* Rounded container buttons */}
-            <div className="flex flex-row items-center gap-1.5">
-              <button
-                className="flex items-center gap-2 px-3 py-2 rounded-full bg-background-tint-01 border border-border-02 text-text-02 text-sm font-medium hover:bg-background-tint-02 hover:border-border-03 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={() => {}}
-                disabled={disabled}
-              >
-                Option 1
-              </button>
-              <button
-                className="flex items-center gap-2 px-3 py-2 rounded-full bg-background-tint-01 border border-border-02 text-text-02 text-sm font-medium hover:bg-background-tint-02 hover:border-border-03 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={() => {}}
-                disabled={disabled}
-              >
-                Option 2
-              </button>
-              <button
-                className="flex items-center gap-2 px-3 py-2 rounded-full bg-background-tint-01 border border-border-02 text-text-02 text-sm font-medium hover:bg-background-tint-02 hover:border-border-03 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={() => {}}
-                disabled={disabled}
-              >
-                Option 3
-              </button>
-            </div>
 
             {/* LLM popover - loads when ready */}
             <div

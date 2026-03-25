@@ -77,7 +77,7 @@ export default function Logo({ folded, size, className }: LogoProps) {
             )}
             nowrap
           >
-            Powered by Onyx
+            Powered by SupaDense
           </Text>
         )}
       </div>
@@ -98,8 +98,21 @@ export default function Logo({ folded, size, className }: LogoProps) {
   return applicationName ? (
     renderNameAndPoweredBy({ includeLogo: true, includeName: true })
   ) : folded ? (
-    <OnyxIcon size={foldedSize} className={cn("flex-shrink-0", className)} />
+    <div
+      className={cn(
+        "flex items-center justify-center rounded-lg bg-brand-500 text-white font-bold flex-shrink-0",
+        className
+      )}
+      style={{ width: foldedSize, height: foldedSize, fontSize: foldedSize * 0.45 }}
+    >
+      S
+    </div>
   ) : (
-    <OnyxLogoTypeIcon size={unfoldedSize} className={className} />
+    <span
+      className={cn("font-bold text-text-01 tracking-tight", className)}
+      style={{ fontSize: unfoldedSize * 0.25 }}
+    >
+      SupaDense
+    </span>
   );
 }

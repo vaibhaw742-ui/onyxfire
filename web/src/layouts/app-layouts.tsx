@@ -113,10 +113,7 @@ function Footer() {
   const settings = useSettingsContext();
 
   const customFooterContent =
-    settings?.enterpriseSettings?.custom_lower_disclaimer_content ||
-    `[Onyx ${
-      settings?.webVersion || "dev"
-    }](https://www.onyx.app/) - Open Source AI Platform`;
+    settings?.enterpriseSettings?.custom_lower_disclaimer_content || "";
 
   return (
     <footer className="w-full flex flex-row justify-center items-center gap-2 pb-2 mt-auto">
