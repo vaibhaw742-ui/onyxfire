@@ -10,6 +10,7 @@ from onyx.configs.constants import KV_REINDEX_KEY
 from onyx.configs.constants import KV_SEARCH_SETTINGS
 from onyx.configs.embedding_configs import SUPPORTED_EMBEDDING_MODELS
 from onyx.configs.embedding_configs import SupportedEmbeddingModel
+from onyx.configs.model_configs import GEN_AI_API_BASE
 from onyx.configs.model_configs import GEN_AI_API_KEY
 from onyx.configs.model_configs import GEN_AI_MODEL_VERSION
 from onyx.context.search.models import SavedSearchSettings
@@ -286,8 +287,31 @@ def setup_postgres(db_session: Session) -> None:
     create_initial_default_connector(db_session)
     associate_default_cc_pair(db_session)
 
-    if GEN_AI_API_KEY and fetch_default_provider(db_session) is None:
-        # Only for dev flows
+    if GEN_AI_API_KEY and GEN_AI_API_BASE:
+        # Custom gateway (e.g. OpenClaw) — upsert on every startup so config stays in sync
+        logger.notice("Setting up custom gateway LLM provider from env.")
+        llm_model = GEN_AI_MODEL_VERSION or "openclaw"
+        model_req = LLMProviderUpsertRequest(
+            name="openclaw",
+            provider=LlmProviderNames.OPENAI,
+            api_key=GEN_AI_API_KEY,
+            api_base=GEN_AI_API_BASE,
+            api_version=None,
+            custom_config=None,
+            default_model_name=llm_model,
+            is_public=True,
+            groups=[],
+            model_configurations=[
+                ModelConfigurationUpsertRequest(name=llm_model, is_visible=True)
+            ],
+            api_key_changed=True,
+        )
+        new_llm_provider = upsert_llm_provider(
+            llm_provider_upsert_request=model_req, db_session=db_session
+        )
+        update_default_provider(provider_id=new_llm_provider.id, db_session=db_session)
+    elif GEN_AI_API_KEY and fetch_default_provider(db_session) is None:
+        # Only for dev flows — plain OpenAI key, no custom base
         logger.notice("Setting up default OpenAI LLM for dev.")
 
         llm_model = GEN_AI_MODEL_VERSION or "gpt-4o-mini"
