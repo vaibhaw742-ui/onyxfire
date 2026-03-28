@@ -3,6 +3,10 @@ OpenClaw Gateway integration for OnyxFire chat.
 
 Streams chat responses from an OpenClaw gateway WebSocket and yields them
 as OnyxFire Packet objects compatible with the existing streaming format.
+
+Device identity (ED25519) is used on every connect so the gateway keeps the
+requested scopes intact and auto-approves pairing on first use when the
+gateway sees the request from loopback (host-networking mode).
 """
 import json
 import uuid
@@ -10,6 +14,7 @@ from collections.abc import AsyncGenerator
 
 from websockets.asyncio.client import connect
 
+from onyx.chat.openclaw_device import build_device_connect_block
 from onyx.server.query_and_chat.placement import Placement
 from onyx.server.query_and_chat.streaming_models import (
     AgentResponseDelta,
@@ -35,32 +40,43 @@ async def stream_from_openclaw(
     OnyxFire Packet objects as the response streams in.
 
     Protocol:
-    1. Connect → receive connect.challenge event
-    2. Send connect request with token auth → wait for res with matching id
-    3. Send chat.send request → wait for res with matching id
-    4. Receive chat events with state=delta (cumulative text) and state=final
+    1. Connect → receive connect.challenge event (contains nonce)
+    2. Send connect request with device identity + token auth
+    3. Send chat.send request
+    4. Receive chat events (state=delta cumulative text, state=final)
     5. Yield AgentResponseStart, AgentResponseDelta (diffs), OverallStop
 
-    Background events (tick, agent, health) are skipped during handshake.
-    ping_interval=None disables websockets keepalive so long responses don't time out.
+    Device identity prevents the gateway from clearing the requested scopes,
+    and triggers silent local pairing auto-approval on first use.
+    ping_interval=None disables websockets keepalive for long responses.
     """
     instance_id = str(uuid.uuid4())
     connect_id = str(uuid.uuid4())
     chat_id = str(uuid.uuid4())
     idempotency_key = str(uuid.uuid4())
 
-    # ping_interval=None disables the websockets keepalive ping so long-running
-    # OpenClaw responses don't cause the connection to be dropped.
     async with connect(gateway_url, ping_interval=None) as ws:
-        # ── Step 1: wait for the connect.challenge event ──────────────────────
+        # ── Step 1: wait for connect.challenge, extract nonce ─────────────────
+        challenge_nonce = str(uuid.uuid4())  # fallback if payload is missing
         async for raw in ws:
             msg = json.loads(raw)
             if msg.get("type") == "event" and msg.get("event") == "connect.challenge":
+                challenge_nonce = msg.get("payload", {}).get("nonce", challenge_nonce)
                 break
         else:
             raise RuntimeError("OpenClaw gateway closed before sending connect.challenge")
 
-        # ── Step 2: send connect and wait for the matching response ───────────
+        # ── Step 2: send connect with device identity ──────────────────────────
+        scopes = ["operator.write"]
+        device_block = build_device_connect_block(
+            nonce=challenge_nonce,
+            token=token,
+            client_id="cli",
+            client_mode="cli",
+            role="operator",
+            scopes=scopes,
+        )
+
         await ws.send(json.dumps({
             "type": "req",
             "id": connect_id,
@@ -78,7 +94,8 @@ async def stream_from_openclaw(
                 "caps": [],
                 "auth": {"token": token},
                 "role": "operator",
-                "scopes": ["operator.admin", "operator.read", "operator.write"],
+                "scopes": scopes,
+                "device": device_block,
             },
         }))
 
@@ -86,12 +103,18 @@ async def stream_from_openclaw(
             msg = json.loads(raw)
             if msg.get("type") == "res" and msg.get("id") == connect_id:
                 if not msg.get("ok"):
-                    error = msg.get("error", {}).get("message", "unknown")
-                    raise RuntimeError(f"OpenClaw connect failed: {error}")
+                    error = msg.get("error", {})
+                    code = error.get("code", "")
+                    message_text = error.get("message", "unknown")
+                    if code == "NOT_PAIRED" or "pairing" in message_text.lower():
+                        raise RuntimeError(
+                            "OpenClaw pairing required — approve 'onyx-chat' device "
+                            "in the OpenClaw UI, then try again."
+                        )
+                    raise RuntimeError(f"OpenClaw connect failed: {message_text}")
                 break
-            # skip background events that arrive before the connect response
 
-        # ── Step 3: send chat.send and wait for the matching response ─────────
+        # ── Step 3: send chat.send ─────────────────────────────────────────────
         await ws.send(json.dumps({
             "type": "req",
             "id": chat_id,
@@ -110,9 +133,8 @@ async def stream_from_openclaw(
                     error = msg.get("error", {}).get("message", "unknown")
                     raise RuntimeError(f"OpenClaw chat.send failed: {error}")
                 break
-            # skip background events that arrive before chat.send is accepted
 
-        # ── Step 4: stream chat events ────────────────────────────────────────
+        # ── Step 4: stream chat events ─────────────────────────────────────────
         yield Packet(placement=_DEFAULT_PLACEMENT, obj=AgentResponseStart())
 
         prev_text = ""
