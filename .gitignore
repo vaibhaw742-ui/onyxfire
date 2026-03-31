@@ -14,6 +14,9 @@
 .mypy_cache
 .idea
 
+# openclaw
+openclaw_learning/workspace/categories
+
 # testing
 /web/test-results/
 backend/onyx/agent_search/main/test_data.json
