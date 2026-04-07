@@ -23,7 +23,6 @@ services:
       - NEXT_TELEMETRY_DISABLED=1
       - INTERNAL_URL=${INTERNAL_URL:-http://api_server:8080}
       - NODE_OPTIONS=--max-old-space-size=4096
-
   api_server:
     command: >
       /bin/sh -c "alembic upgrade head &&
@@ -32,44 +31,36 @@ services:
     volumes:
       - ../../backend/onyx:/app/onyx
       - ../../backend/ee:/app/ee
-      - ../../openclaw_learning/workspace/categories:/app/categories
     ports:
       - "8080:8080"
     environment:
       - LEARNING_SERVICE_URL=http://learning_service:8001
-
+      - CATEGORIES_MD_DIR=/app/categories
   background:
     volumes:
       - ../../backend/onyx:/app/onyx
       - ../../backend/ee:/app/ee
-
   relational_db:
     image: pgvector/pgvector:pg15
     ports:
       - "5432:5432"
-
   index:
     ports:
       - "19071:19071"
       - "8081:8081"
-
   inference_model_server:
     ports:
       - "9000:9000"
-
   cache:
     ports:
       - "6379:6379"
-
   minio:
     ports:
       - "9004:9000"
       - "9005:9001"
-
   code-interpreter:
     ports:
       - "8000:8000"
-
   learning_service:
     image: 982733204083.dkr.ecr.ap-south-1.amazonaws.com/learning-service:latest
     container_name: learning_service
@@ -82,13 +73,12 @@ services:
       - LEARNING_SERVICE_PORT=8001
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - AIRTOP_API_KEY=${AIRTOP_API_KEY}
-      - CATEGORIES_MD_DIR=${CATEGORIES_MD_DIR}
+      - WORKSPACE_ROOT=/workspace
     depends_on:
       relational_db:
         condition: service_healthy
     volumes:
       - ../../openclaw_learning/workspace:/workspace
-
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: pgadmin
@@ -105,7 +95,6 @@ services:
         condition: service_healthy
     volumes:
       - pgadmin_data:/var/lib/pgadmin
-
 volumes:
   pgadmin_data:
   web_node_modules:
