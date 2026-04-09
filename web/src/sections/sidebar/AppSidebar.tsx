@@ -35,14 +35,12 @@ import { useProjects } from "@/lib/hooks/useProjects";
 import { useAgents, useCurrentAgent, usePinnedAgents } from "@/hooks/useAgents";
 import { useAppSidebarContext } from "@/refresh-components/contexts/AppSidebarContext";
 import ProjectFolderButton from "@/sections/sidebar/ProjectFolderButton";
-import CreateProjectModal from "@/components/modals/CreateProjectModal";
 import MoveCustomAgentChatModal from "@/components/modals/MoveCustomAgentChatModal";
 import { useProjectsContext } from "@/app/app/projects/ProjectsContext";
 import { removeChatSessionFromProject } from "@/app/app/projects/projectsService";
 import type { Project } from "@/app/app/projects/projectsService";
 import SidebarWrapper from "@/sections/sidebar/SidebarWrapper";
 import { usePopup } from "@/components/admin/connectors/Popup";
-import IconButton from "@/refresh-components/buttons/IconButton";
 import { cn } from "@/lib/utils";
 import {
   DRAG_TYPES,
@@ -55,14 +53,11 @@ import { ChatSession } from "@/app/app/interfaces";
 import SidebarBody from "@/sections/sidebar/SidebarBody";
 import { useUser } from "@/components/user/UserProvider";
 import useAppFocus from "@/hooks/useAppFocus";
-import { useCreateModal } from "@/refresh-components/contexts/ModalContext";
 import useScreenSize from "@/hooks/useScreenSize";
 import {
+  SvgBookOpen,
   SvgDevKit,
   SvgEditBig,
-  SvgFolderPlus,
-  SvgMoreHorizontal,
-  SvgOnyxOctagon,
   SvgSearchMenu,
   SvgSettings,
 } from "@opal/icons";
@@ -418,7 +413,6 @@ const MemoizedAppSidebarInner = memo(
 
     const { isAdmin, isCurator } = useUser();
     const activeSidebarTab = useAppFocus();
-    const createProjectModal = useCreateModal();
     const newSessionButton = useMemo(() => {
       const href =
         combinedSettings?.settings?.disable_default_assistant && currentAgent
@@ -461,40 +455,6 @@ const MemoizedAppSidebarInner = memo(
       ),
       [folded]
     );
-    const moreAgentsButton = useMemo(
-      () => (
-        <div data-testid="AppSidebar/more-agents">
-          <SidebarTab
-            leftIcon={
-              folded || visibleAgents.length === 0
-                ? SvgOnyxOctagon
-                : SvgMoreHorizontal
-            }
-            href="/app/agents"
-            folded={folded}
-            transient={activeSidebarTab.isMoreAgents()}
-            lowlight={!folded}
-          >
-            {visibleAgents.length === 0 ? "Explore Agents" : "More Agents"}
-          </SidebarTab>
-        </div>
-      ),
-      [folded, activeSidebarTab, visibleAgents]
-    );
-    const newProjectButton = useMemo(
-      () => (
-        <SidebarTab
-          leftIcon={SvgFolderPlus}
-          onClick={() => createProjectModal.toggle(true)}
-          transient={createProjectModal.isOpen}
-          folded={folded}
-          lowlight={!folded}
-        >
-          New Project
-        </SidebarTab>
-      ),
-      [folded, createProjectModal.toggle, createProjectModal.isOpen]
-    );
     const handleShowBuildIntro = useCallback(() => {
       setShowIntroAnimation(true);
     }, []);
@@ -525,10 +485,6 @@ const MemoizedAppSidebarInner = memo(
     return (
       <>
         {popup}
-        <createProjectModal.Provider>
-          <CreateProjectModal />
-        </createProjectModal.Provider>
-
         {showMoveCustomAgentModal && (
           <MoveCustomAgentChatModal
             onCancel={() => {
@@ -596,17 +552,15 @@ const MemoizedAppSidebarInner = memo(
               <div className="flex flex-col gap-0.5">
                 {newSessionButton}
                 {searchChatsButton}
+                <SidebarTab leftIcon={SvgBookOpen} folded={folded} href="/wiki">
+                  Wiki
+                </SidebarTab>
                 {isOnyxCraftEnabled && buildButton}
               </div>
             }
           >
             {/* When folded, show icons immediately without waiting for data */}
-            {folded ? (
-              <>
-                {moreAgentsButton}
-                {newProjectButton}
-              </>
-            ) : isLoadingDynamicContent ? null : (
+            {folded ? null : isLoadingDynamicContent ? null : (
               <>
                 {/* Agents */}
                 <DndContext
@@ -626,7 +580,6 @@ const MemoizedAppSidebarInner = memo(
                         />
                       ))}
                     </SortableContext>
-                    {moreAgentsButton}
                   </SidebarSection>
                 </DndContext>
 
@@ -641,21 +594,10 @@ const MemoizedAppSidebarInner = memo(
                   onDragEnd={handleChatProjectDragEnd}
                 >
                   {/* Projects */}
-                  <SidebarSection
-                    title="Projects"
-                    action={
-                      <IconButton
-                        icon={SvgFolderPlus}
-                        internal
-                        tooltip="New Project"
-                        onClick={() => createProjectModal.toggle(true)}
-                      />
-                    }
-                  >
+                  <SidebarSection title="Projects">
                     {projects.map((project) => (
                       <ProjectFolderButton key={project.id} project={project} />
                     ))}
-                    {projects.length === 0 && newProjectButton}
                   </SidebarSection>
 
                   {/* Recents */}
